@@ -8,111 +8,63 @@ contract ReputethTest is Test {
     address public alice = address(0x1);
     address public bob = address(0x2);
     address public charlie = address(0x3);
-    address public dave = address(0x4);
     uint256 public initBal = 1e9 * 1e18;
+    uint256 public limit = 1e5 * 1e18;
 
     event Transfer(address indexed from, address indexed to, uint256 amount);
+
     address constant OWNER = 0x9906B794407BBe3C1Ca9741fdB30Dc2fACc838DE;
+
     function setUp() public {
         reputeth = new Reputeth(OWNER);
     }
 
-    function testInitialBalance() public view {
-        assertEq(reputeth.balanceOf(alice), initBal);
-        assertEq(reputeth.balanceOf(bob), initBal);
-        assertEq(reputeth.balanceOf(charlie), initBal);
+    function testInitialState() public view {
+        assertEq(reputeth.name(), "REPUT.ETH");
+        assertEq(reputeth.symbol(), "RPT");
+        assertEq(reputeth.decimals(), 18);
+        assertEq(reputeth.totalSupply(), type(uint256).max);
+        assertEq(reputeth.owner(), OWNER);
     }
 
-    function testTransferSuccess() public {
+    function testBalanceOf() public view {
+        assertEq(reputeth.balanceOf(alice), initBal);
+        assertEq(reputeth.balanceOf(bob), initBal);
+    }
+
+    function testTransfer() public {
         uint256 transferAmount = 1000 * 1e18;
         vm.deal(bob, 1 ether);
 
-        vm.prank(alice, alice);
+        vm.prank(alice);
         reputeth.transfer(bob, transferAmount);
 
         assertEq(reputeth.balanceOf(alice), initBal + (transferAmount / 3));
-
         assertEq(reputeth.balanceOf(bob), initBal - transferAmount);
+        assertEq(reputeth.plus(alice), transferAmount / 3);
+        assertEq(reputeth.minus(bob), transferAmount);
     }
 
-    function testTransferUpdatesReputation() public {
-        uint256 transferAmount = 1000 * 1e18;
-        vm.deal(bob, 1 ether);
-
-        uint256 aliceInitPlus = reputeth.plus(alice);
-        uint256 bobInitMinus = reputeth.minus(bob);
-
-        vm.prank(alice, alice);
-        reputeth.transfer(bob, transferAmount);
-
-        assertEq(reputeth.plus(alice), aliceInitPlus + (transferAmount / 3));
-        assertEq(reputeth.minus(bob), bobInitMinus + transferAmount);
-    }
-
-    function testTransferRevertsWhenOverLimit() public {
-        uint256 overLimit = uint256(2e5) * 1e18;
-        vm.deal(bob, 1 ether);
-
-        vm.prank(alice, alice);
+    function testTransferReverts() public {
+        // Test OverLimit
+        vm.prank(alice);
         vm.expectRevert(Reputeth.OverLimit.selector);
-        reputeth.transfer(bob, overLimit);
-    }
+        reputeth.transfer(bob, limit + 1);
 
-    function testTransferRevertsWhenRecipientInactive() public {
+        // Test InactiveAddress
         address inactiveAddress = address(0x5);
-        uint256 transferAmount = 1000 * 1e18;
-
-        vm.prank(alice, alice);
+        vm.prank(alice);
         vm.expectRevert(Reputeth.InactiveAddress.selector);
-        reputeth.transfer(inactiveAddress, transferAmount);
+        reputeth.transfer(inactiveAddress, 1000 * 1e18);
+
+        // Test SelfTransfer
+        vm.deal(alice, 1 ether);
+        vm.prank(alice);
+        vm.expectRevert(Reputeth.SelfTransfer.selector);
+        reputeth.transfer(alice, 1000 * 1e18);
     }
 
-    function testMultipleTransfersUpdateBalances() public {
-        vm.deal(bob, 1 ether);
-        vm.prank(alice, alice);
-        reputeth.transfer(bob, 1000 * 1e18);
-
-        vm.deal(charlie, 1 ether);
-        vm.prank(bob, bob);
-        reputeth.transfer(charlie, 500 * 1e18);
-
-        uint256 aliceExpected = initBal + ((uint256(1000) * 1e18) / 3);
-        uint256 bobExpected = initBal - (uint256(1000) * 1e18) + ((uint256(500) * 1e18) / 3);
-        uint256 charlieExpected = initBal - (uint256(500) * 1e18);
-
-        assertEq(reputeth.balanceOf(alice), aliceExpected);
-        assertEq(reputeth.balanceOf(bob), bobExpected);
-        assertEq(reputeth.balanceOf(charlie), charlieExpected);
-    }
-
-    function testAirdropDistributesInitialBalance() public {
-        address[] memory accounts = new address[](3);
-        accounts[0] = bob;
-        accounts[1] = charlie;
-        accounts[2] = dave;
-
-        vm.deal(bob, 1 ether);
-        vm.deal(charlie, 1 ether);
-        vm.deal(dave, 1 ether);
-
-        vm.expectEmit(true, true, false, false);
-        emit Transfer(address(reputeth), bob, initBal);
-
-        vm.expectEmit(true, true, false, false);
-        emit Transfer(address(reputeth), charlie, initBal);
-
-        vm.expectEmit(true, true, false, false);
-        emit Transfer(address(reputeth), dave, initBal);
-
-        vm.prank(reputeth.owner());
-        reputeth.airdrop(accounts);
-
-        assertEq(reputeth.balanceOf(bob), initBal);
-        assertEq(reputeth.balanceOf(charlie), initBal);
-        assertEq(reputeth.balanceOf(dave), initBal);
-    }
-
-    function testReputationCalculation() public {
+    function testReputation() public {
         vm.deal(bob, 1 ether);
         vm.deal(charlie, 1 ether);
 
@@ -125,5 +77,35 @@ contract ReputethTest is Test {
         assertEq(reputeth.reputation(alice), int256(500 * 1e18));
         assertEq(reputeth.reputation(bob), int256(-1200 * 1e18));
         assertEq(reputeth.reputation(charlie), int256(-900 * 1e18));
+    }
+
+    function testAirdrop() public {
+        address[] memory accounts = new address[](2);
+        accounts[0] = bob;
+        accounts[1] = charlie;
+
+        vm.deal(bob, 1 ether);
+        vm.deal(charlie, 1 ether);
+
+        vm.expectEmit(true, true, false, false);
+        emit Transfer(address(reputeth), bob, initBal);
+
+        vm.expectEmit(true, true, false, false);
+        emit Transfer(address(reputeth), charlie, initBal);
+
+        vm.prank(OWNER);
+        reputeth.airdrop(accounts);
+
+        assertEq(reputeth.balanceOf(bob), initBal);
+        assertEq(reputeth.balanceOf(charlie), initBal);
+    }
+
+    function testAirdropRevert() public {
+        address[] memory accounts = new address[](1);
+        accounts[0] = bob;
+
+        vm.prank(alice);
+        vm.expectRevert(ERC173.OnlyOwner.selector);
+        reputeth.airdrop(accounts);
     }
 }

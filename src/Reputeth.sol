@@ -69,7 +69,7 @@ contract Reputeth is ERC165, ERC173, Rescue, iReputeth {
     uint256 public constant initBal = 1e9 * 1e18;
     uint256 public constant limit = 1e5 * 1e18;
 
-    //mapping(address => mapping(address => uint256)) public allowance;
+    // mapping(address => mapping(address => uint256)) public allowance;
     mapping(address => uint256) public plus;
     mapping(address => uint256) public minus;
 
@@ -77,8 +77,8 @@ contract Reputeth is ERC165, ERC173, Rescue, iReputeth {
 
     error OverLimit();
     error InactiveAddress();
-    //error NotPermitted();
-    //event Approval(address indexed owner, address indexed spender, uint256 value);
+    // error NotPermitted();
+    // event Approval(address indexed owner, address indexed spender, uint256 value);
 
     constructor(address _owner) {
         owner = _owner;
@@ -93,10 +93,12 @@ contract Reputeth is ERC165, ERC173, Rescue, iReputeth {
         return int256(plus[account]) - int256(minus[account]);
     }
 
+    error SelfTransfer();
+
     function transfer(address to, uint256 amount) external returns (bool) {
         require(amount <= limit, OverLimit());
         require(to.balance > 0, InactiveAddress());
-        require(msg.sender != to, InactiveAddress());
+        require(msg.sender != to, SelfTransfer());
         unchecked {
             plus[msg.sender] += amount / 3;
             minus[to] += amount;
@@ -105,17 +107,20 @@ contract Reputeth is ERC165, ERC173, Rescue, iReputeth {
         }
         return true;
     }
-
     /*
     function transferFrom(address from, address to, uint256 amount) external returns (bool) {
-        require(amount <= limit, OverLimit());
-        require(to.balance > 0, InactiveAddress());
-        if(allowance[from][msg.sender] != type(uint256).max) {
-            allowance[from][msg.sender] -= amount;
-        }
         unchecked {
-            plus[msg.sender] += amount / 10;
-            plus[from] += amount / 10;
+            uint sub = amount / 2;
+            require(amount <= sub, OverLimit());
+            require(to.balance > 0, InactiveAddress());
+            require(from )
+            if(allowance[from][msg.sender] != type(uint256).max) {
+                require(allowance[from][msg.sender] >= amount, NotPermitted());
+                allowance[from][msg.sender] -= amount;
+            }
+            sub = sub / 5;
+            plus[msg.sender] += sub;
+            plus[from] += sub;
             minus[to] += amount / 2;
             emit Transfer(to, address(this), amount);
             emit Transfer(address(this), msg.sender, amount / 3);
