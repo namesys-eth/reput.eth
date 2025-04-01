@@ -4,3 +4,18 @@ out = "out"
 libs = ["lib"]
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
+
+# Enables or disables the optimizer
+optimizer = true
+viaIR = true
+
+# The number of optimizer runs
+optimizer_runs = 9999999
+
+
+[rpc_endpoints]
+main = "https://eth.llamarpc.com"
+base = "https://base.llamarpc.com"
+poly = "https://rpc.ankr.com/polygon"
+opti = "https://rpc.ankr.com/optimism"
+arbi = "https://rpc.ankr.com/arbitrum"
